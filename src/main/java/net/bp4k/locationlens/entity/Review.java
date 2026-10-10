@@ -35,7 +35,8 @@ public class Review
     private UUID reviewId; 
 
     private Integer rating; 
-    private String text; 
+    @jakarta.persistence.Column(length = 2000)
+    private String text;
     private Instant createdAt; 
     private UUID userId; 
     private String placeId; 
