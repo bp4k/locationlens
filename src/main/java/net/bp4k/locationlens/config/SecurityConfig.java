@@ -68,7 +68,7 @@ public class SecurityConfig {
     @Order(1)
     SecurityFilterChain apiSecurityFilterChain(HttpSecurity http)
             throws Exception {
-        return http 
+        return http
             .securityMatcher("/api/v1/**")
             .cors(withDefaults())
             .sessionManagement(session -> session.sessionCreationPolicy(
