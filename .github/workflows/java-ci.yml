@@ -1,0 +1,29 @@
+name: Java CI
+# Compiles Java code and ensures that the authentication tests ( AuthController/IdpTokenRelaySuccessHandler ) are working 
+# Does not consider LocationIensApplicationTest because it will fail w/o IDP_URL configured
+on:
+  push:
+  pull_request:
+permissions: 
+  # checkout needs read access to fetch repo, and declaring it keeps the workflow working if those defaults are later tightened while ensuring it oes not get write access. 
+  contents: read
+jobs:
+  auth-tests:
+    name: Compile and test authentication
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4.2.2 
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4.5.0 
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      # ./mvnw: uses the project's Maven Wrapper, so CI can use the project's configured Maven version
+      # --batch-mode: makes Maven run without interactive prompts 
+      # --no-transfer-progress: keeps dependency-download progress noise out of the logs 
+      - name: Run authentication tests
+        run: ./mvnw --batch-mode --no-transfer-progress -Dtest=AuthControllerTest,IdpTokenRelaySuccessHandlerTest test
