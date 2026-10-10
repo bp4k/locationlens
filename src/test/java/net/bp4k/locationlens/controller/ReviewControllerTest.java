@@ -14,6 +14,8 @@ import org.springframework.http.MediaType;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -92,10 +94,121 @@ class ReviewControllerTest {
                                   "text": "Great place"
                                 }
                                 """))
-                .andExpect(status().isOk());
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.review_id").value(REVIEW_ID.toString()))
+                .andExpect(jsonPath("$.place_id").value(PLACE_ID))
+                .andExpect(jsonPath("$.rating").value(5))
+                .andExpect(jsonPath("$.text").value("Great place"))
+                .andExpect(jsonPath("$.created_at").exists())
+                .andExpect(jsonPath("$.user_id").doesNotExist())
+                .andExpect(jsonPath("$.userId").doesNotExist());
 
         verify(reviewService).submitReview(
                 USER_ID, PLACE_ID, 5, "Great place");
+    }
+
+    @Test
+    void submitReviewAcceptsCamelCasePlaceIdAlias() throws Exception {
+        authenticateAs(USER_ID);
+        when(reviewService.submitReview(USER_ID, PLACE_ID, 4, "Nice"))
+                .thenReturn(review);
+
+        mockMvc.perform(post("/api/v1/reviews")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"placeId": "place-123", "rating": 4, "text": "Nice"}
+                                """))
+                .andExpect(status().isCreated());
+
+        verify(reviewService).submitReview(USER_ID, PLACE_ID, 4, "Nice");
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {1, 5})
+    void submitReviewAcceptsBoundaryRatings(int rating) throws Exception {
+        authenticateAs(USER_ID);
+        when(reviewService.submitReview(USER_ID, PLACE_ID, rating, "ok"))
+                .thenReturn(review);
+
+        mockMvc.perform(post("/api/v1/reviews")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"place_id\": \"place-123\", \"rating\": " + rating + ", \"text\": \"ok\"}"))
+                .andExpect(status().isCreated());
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {0, 6, -1, 100})
+    void submitReviewRejectsRatingOutsideOneToFive(int rating) throws Exception {
+        authenticateAs(USER_ID);
+
+        mockMvc.perform(post("/api/v1/reviews")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"place_id\": \"place-123\", \"rating\": " + rating + ", \"text\": \"ok\"}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(reviewService);
+    }
+
+    @Test
+    void submitReviewRejectsMissingRating() throws Exception {
+        authenticateAs(USER_ID);
+
+        mockMvc.perform(post("/api/v1/reviews")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"place_id\": \"place-123\", \"text\": \"ok\"}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(reviewService);
+    }
+
+    @Test
+    void submitReviewRejectsBlankPlaceId() throws Exception {
+        authenticateAs(USER_ID);
+
+        mockMvc.perform(post("/api/v1/reviews")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"place_id\": \"  \", \"rating\": 4, \"text\": \"ok\"}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(reviewService);
+    }
+
+    @Test
+    void submitReviewRejectsBlankText() throws Exception {
+        authenticateAs(USER_ID);
+
+        mockMvc.perform(post("/api/v1/reviews")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"place_id\": \"place-123\", \"rating\": 4, \"text\": \"\"}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(reviewService);
+    }
+
+    @Test
+    void submitReviewRejectsTextLongerThan2000Characters() throws Exception {
+        authenticateAs(USER_ID);
+        String tooLong = "a".repeat(2001);
+
+        mockMvc.perform(post("/api/v1/reviews")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"place_id\": \"place-123\", \"rating\": 4, \"text\": \"" + tooLong + "\"}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(reviewService);
+    }
+
+    @Test
+    void submitReviewAcceptsTextOfExactly2000Characters() throws Exception {
+        authenticateAs(USER_ID);
+        String maxText = "a".repeat(2000);
+        when(reviewService.submitReview(USER_ID, PLACE_ID, 4, maxText))
+                .thenReturn(review);
+
+        mockMvc.perform(post("/api/v1/reviews")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"place_id\": \"place-123\", \"rating\": 4, \"text\": \"" + maxText + "\"}"))
+                .andExpect(status().isCreated());
     }
 
     /*
@@ -125,9 +238,13 @@ class ReviewControllerTest {
 
         mockMvc.perform(get("/api/v1/reviews/place/{placeId}", PLACE_ID))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].reviewId")
+                .andExpect(jsonPath("$[0].review_id")
                         .value(REVIEW_ID.toString()))
-                .andExpect(jsonPath("$[0].placeId").value(PLACE_ID));
+                .andExpect(jsonPath("$[0].place_id").value(PLACE_ID))
+                .andExpect(jsonPath("$[0].rating").value(5))
+                .andExpect(jsonPath("$[0].text").value("Great place"))
+                .andExpect(jsonPath("$[0].created_at").exists())
+                .andExpect(jsonPath("$[0].userId").doesNotExist());
 
         verify(reviewService).getReviewsForPlace(PLACE_ID);
     }
@@ -151,8 +268,9 @@ class ReviewControllerTest {
 
         mockMvc.perform(get("/api/v1/reviews/history"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].userId")
-                        .value(USER_ID.toString()));
+                .andExpect(jsonPath("$[0].review_id")
+                        .value(REVIEW_ID.toString()))
+                .andExpect(jsonPath("$[0].userId").doesNotExist());
 
         verify(reviewService).getReviewHistory(USER_ID);
     }

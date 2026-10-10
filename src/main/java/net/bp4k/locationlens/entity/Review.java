@@ -3,17 +3,32 @@ package net.bp4k.locationlens.entity;
 import java.time.Instant; 
 import java.util.UUID;
 
-import org.hibernate.annotations.Check;
 
+import jakarta.persistence.CheckConstraint;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.Getter; 
 
 
 
 @Entity
 @Getter 
-@Check(constraints = "rating < 1 OR rating > 5")
+@Table(
+    name="review",
+    check = @CheckConstraint (
+        name="ck_review_rating_range",
+        constraint = "rating >= 1 AND rating <= 5"
+    ),
+    indexes = {
+        @Index(name="idx_review_place_id", columnList = "place_id")
+    },
+    uniqueConstraints = {
+        @UniqueConstraint(name="uk_review_user_place", columnNames = {"user_id", "place_id"})
+    }
+)
 public class Review
 {
     @Id
