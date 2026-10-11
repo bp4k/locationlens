@@ -27,3 +27,5 @@ jobs:
       # --no-transfer-progress: keeps dependency-download progress noise out of the logs 
       - name: Run authentication tests
         run: ./mvnw --batch-mode --no-transfer-progress -Dtest=AuthControllerTest,IdpTokenRelaySuccessHandlerTest test
+      - name: Run Review tests 
+        run: ./mvnw --batch-mode --no-transfer-progress -Dtest=ReviewControllerTest,ReviewResponseTest,ReviewServiceTest test
