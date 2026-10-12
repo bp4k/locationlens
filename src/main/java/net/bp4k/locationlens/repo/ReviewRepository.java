@@ -6,7 +6,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import net.bp4k.locationlens.entity.Review;
 import java.util.List;
-import java.util.Optional;
 
 
 /**
