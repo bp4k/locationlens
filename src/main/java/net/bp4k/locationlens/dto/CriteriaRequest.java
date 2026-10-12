@@ -20,6 +20,7 @@ public record CriteriaRequest
   @JsonProperty("longitude")
   Double  longitude,
   @JsonProperty("radiusMeters")
+  @jakarta.validation.constraints.NotNull
   Integer radiusMeters,
   @JsonProperty("placeType")
   String[] placeType
