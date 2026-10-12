@@ -2,6 +2,10 @@ package net.bp4k.locationlens.controller;
 
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import jakarta.validation.Valid;
+import net.bp4k.locationlens.dto.CriteriaRequest;
+
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -13,7 +17,7 @@ public class PlaceController {
     // Will implement after the push
     
     @GetMapping("/search")
-    public String search(@RequestParam String param) {
+    public String search(@RequestParam @Valid CriteriaRequest param) {
         return new String();
     }
 
