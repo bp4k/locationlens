@@ -38,13 +38,20 @@ public class User
     @jakarta.persistence.Column(length = 2000)
     private String email;
     private String displayName; // concatenated given and last name
+    private Boolean admin;
 
     protected User() {}
 
-    public User(UUID uuid, String mail, String name) {
-        userId = uuid;
-        email = mail;
-        displayName = name;
+    public User(UUID userId, String email,
+            String displayName, Boolean admin) {
+        this.userId = userId;
+        this.email = email;
+        this.displayName = displayName;
+        this.admin = admin;
+    }
+
+    public User (UUID uuid, String email, String name) {
+        this(uuid, email, name, false);
     }
 
     public void setEmail(String email) {
@@ -53,6 +60,10 @@ public class User
 
     public void setDisplayName(String displayName) {
         this.displayName = displayName;
+    }
+
+    public void setAdmin(Boolean admin) {
+        this.admin = admin;
     }
 }
 
