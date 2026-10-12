@@ -20,14 +20,14 @@ public class PlaceController {
     // Will implement after the push
     
     @GetMapping("/search")
-    @ResponseStatus(HTTPStatus.BAD_REQUEST)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
     public String search(@RequestParam @Valid CriteriaRequest param) {
         return new String();
     }
 
     
     @GetMapping("/{placeId}")
-    @ResponseStatus(HTTPStatus.BAD_REQUEST)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
     public String getPlaceDetails(@PathVariable("placeId") String placeId) {
         return new String();
     }
