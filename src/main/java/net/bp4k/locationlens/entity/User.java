@@ -11,6 +11,8 @@ import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.Getter;
+import lombok.Setter;
+import lombok.AccessLevel;
 
 
 
@@ -20,6 +22,7 @@ import lombok.Getter;
  */
 @Entity
 @Getter
+@Setter
 @Table(
     name="user",
     uniqueConstraints = {
@@ -33,6 +36,7 @@ public class User
      * The ID of the User, uses Keycloak's OIDC subject.
      */
     @Id
+    @Setter(AccessLevel.NONE)
     private UUID userId; 
 
     @jakarta.persistence.Column(length = 2000)
@@ -52,18 +56,6 @@ public class User
 
     public User (UUID uuid, String email, String name) {
         this(uuid, email, name, false);
-    }
-
-    public void setEmail(String email) {
-        this.email = email;
-    }
-
-    public void setDisplayName(String displayName) {
-        this.displayName = displayName;
-    }
-
-    public void setAdmin(Boolean admin) {
-        this.admin = admin;
     }
 }
 
