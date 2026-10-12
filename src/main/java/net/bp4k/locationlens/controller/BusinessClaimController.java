@@ -21,7 +21,7 @@ import net.bp4k.locationlens.model.BusinessClaimRequest;
 import net.bp4k.locationlens.service.BusinessClaimService;
 
 /**
- * HTTP draft for business claims. The existing API security chain validates
+ * HTTP operations for business claims. The existing API security chain validates
  * bearer tokens. Identity comes from their subject, never from request JSON.
  * Persistence and claim transitions belong to BusinessClaimService.
  */
