@@ -14,12 +14,14 @@ class ReviewResponseTest {
     @Test
     void fromCopiesPublicFieldsFromReview() {
         UUID reviewId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
         Instant createdAt = Instant.parse("2026-01-01T12:00:00Z");
-        Review review = new Review(reviewId, 3, "Okay", createdAt, UUID.randomUUID(), "place-9");
+        Review review = new Review(reviewId, 3, "Okay", createdAt, userId, "place-9");
 
         ReviewResponse response = ReviewResponse.from(review);
 
         assertEquals(reviewId, response.reviewId());
+        assertEquals(userId, response.userId());
         assertEquals("place-9", response.placeId());
         assertEquals(3, response.rating());
         assertEquals("Okay", response.text());

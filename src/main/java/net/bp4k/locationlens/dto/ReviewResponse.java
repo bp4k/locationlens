@@ -9,6 +9,7 @@ import net.bp4k.locationlens.entity.Review;
 
 public record ReviewResponse(
     @JsonProperty("review_id") UUID reviewId,
+    @JsonProperty("user_id") UUID userId,
     @JsonProperty("place_id") String placeId,
     @JsonProperty("rating") Integer rating,
     @JsonProperty("text") String text,
@@ -17,6 +18,7 @@ public record ReviewResponse(
     public static ReviewResponse from(Review review) {
         return new ReviewResponse(
             review.getReviewId(),
+            review.getUserId(),
             review.getPlaceId(),
             review.getRating(),
             review.getText(),

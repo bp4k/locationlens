@@ -100,7 +100,7 @@ class ReviewControllerTest {
                 .andExpect(jsonPath("$.rating").value(5))
                 .andExpect(jsonPath("$.text").value("Great place"))
                 .andExpect(jsonPath("$.created_at").exists())
-                .andExpect(jsonPath("$.user_id").doesNotExist())
+                .andExpect(jsonPath("$.user_id").value(USER_ID.toString()))
                 .andExpect(jsonPath("$.userId").doesNotExist());
 
         verify(reviewService).submitReview(
@@ -244,6 +244,7 @@ class ReviewControllerTest {
                 .andExpect(jsonPath("$[0].rating").value(5))
                 .andExpect(jsonPath("$[0].text").value("Great place"))
                 .andExpect(jsonPath("$[0].created_at").exists())
+                .andExpect(jsonPath("$[0].user_id").value(USER_ID.toString()))
                 .andExpect(jsonPath("$[0].userId").doesNotExist());
 
         verify(reviewService).getReviewsForPlace(PLACE_ID);
@@ -270,6 +271,7 @@ class ReviewControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].review_id")
                         .value(REVIEW_ID.toString()))
+                .andExpect(jsonPath("$[0].user_id").value(USER_ID.toString()))
                 .andExpect(jsonPath("$[0].userId").doesNotExist());
 
         verify(reviewService).getReviewHistory(USER_ID);
