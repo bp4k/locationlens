@@ -19,10 +19,12 @@ import org.springframework.security.oauth2.client.web
     .OAuth2AuthorizedClientRepository;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 
 import tools.jackson.databind.json.JsonMapper;
 
 import net.bp4k.locationlens.dto.TokenResponse;
+import net.bp4k.locationlens.service.AuthenticationService;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -30,6 +32,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -114,6 +118,53 @@ class IdpTokenRelaySuccessHandlerTest {
     }
 
     @Test
+    @DisplayName("every successful login creates or updates the local"
+            + " User from the OIDC claims")
+    void syncsLocalUserFromOidcClaimsOnEveryLogin() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        // Non-API login branch - syncing must not depend on which
+        // branch onAuthenticationSuccess ultimately takes.
+        request.getSession(true);
+
+        AuthenticationService authenticationService =
+                mock(AuthenticationService.class);
+        IdpTokenRelaySuccessHandler handler =
+                newHandler(authenticationService);
+        OAuth2AuthenticationToken authentication = oidcAuthentication(
+                "11111111-1111-1111-1111-111111111111",
+                "jane@example.com", "Jane", "Doe");
+
+        handler.onAuthenticationSuccess(request, response, authentication);
+
+        verify(authenticationService).createOrUpdateUser(
+                "11111111-1111-1111-1111-111111111111",
+                "jane@example.com", "Jane", "Doe");
+    }
+
+    @Test
+    @DisplayName("a login whose principal is not an OidcUser is not"
+            + " synced to the local User table")
+    void doesNotSyncWhenPrincipalIsNotAnOidcUser() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        request.getSession(true);
+
+        AuthenticationService authenticationService =
+                mock(AuthenticationService.class);
+        IdpTokenRelaySuccessHandler handler =
+                newHandler(authenticationService);
+        // A plain mock Authentication has a null principal by
+        // default, which is not an OidcUser.
+        Authentication authentication = mock(Authentication.class);
+
+        handler.onAuthenticationSuccess(request, response, authentication);
+
+        verify(authenticationService, never()).createOrUpdateUser(
+                any(), any(), any(), any());
+    }
+
+    @Test
     @DisplayName("an API login with a redirect target redirects there"
             + " with the token appended as query parameters")
     void redirectsWithTokenQueryStringWhenTargetRequested()
@@ -163,13 +214,28 @@ class IdpTokenRelaySuccessHandlerTest {
      * @return the handler under test
      */
     private static IdpTokenRelaySuccessHandler newHandler() {
+        return newHandler(mock(AuthenticationService.class));
+    }
+
+    /**
+     * Same as {@link #newHandler()}, but with a caller-supplied
+     * {@link AuthenticationService} so tests can verify how it was
+     * called.
+     *
+     * @param authenticationService the service to wire into the
+     *                              handler
+     * @return the handler under test
+     */
+    private static IdpTokenRelaySuccessHandler newHandler(
+            AuthenticationService authenticationService) {
         OAuth2AuthorizedClientRepository repository =
                 mock(OAuth2AuthorizedClientRepository.class);
         when(repository.loadAuthorizedClient(
                 anyString(), any(), any()))
                 .thenReturn(authorizedClient());
         return new IdpTokenRelaySuccessHandler(
-                repository, JsonMapper.builder().build());
+                repository, JsonMapper.builder().build(),
+                authenticationService);
     }
 
     /**
@@ -211,6 +277,30 @@ class IdpTokenRelaySuccessHandlerTest {
                 mock(OAuth2AuthenticationToken.class);
         when(authentication.getAuthorizedClientRegistrationId())
                 .thenReturn(REGISTRATION_ID);
+        return authentication;
+    }
+
+    /**
+     * Same as {@link #oidcAuthentication()}, but with its principal
+     * stubbed as an {@link OidcUser} carrying the given standard OIDC
+     * claims, for tests that verify the local-user-sync behavior.
+     *
+     * @param subject    the {@code sub} claim
+     * @param email      the {@code email} claim
+     * @param givenName  the {@code given_name} claim
+     * @param familyName the {@code family_name} claim
+     * @return the authentication token
+     */
+    private static OAuth2AuthenticationToken oidcAuthentication(
+            String subject, String email, String givenName,
+            String familyName) {
+        OAuth2AuthenticationToken authentication = oidcAuthentication();
+        OidcUser oidcUser = mock(OidcUser.class);
+        when(oidcUser.getSubject()).thenReturn(subject);
+        when(oidcUser.getEmail()).thenReturn(email);
+        when(oidcUser.getGivenName()).thenReturn(givenName);
+        when(oidcUser.getFamilyName()).thenReturn(familyName);
+        when(authentication.getPrincipal()).thenReturn(oidcUser);
         return authentication;
     }
 }

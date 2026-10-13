@@ -19,6 +19,7 @@ import org.springframework.security.oauth2.client.authentication
 import org.springframework.security.oauth2.client.web
     .OAuth2AuthorizedClientRepository;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.web.authentication
     .AuthenticationSuccessHandler;
 import org.springframework.security.web.authentication
@@ -28,6 +29,7 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
 import net.bp4k.locationlens.dto.TokenResponse;
+import net.bp4k.locationlens.service.AuthenticationService;
 
 /**
  * Decides what happens right after a user finishes logging in with
@@ -131,32 +133,49 @@ public class IdpTokenRelaySuccessHandler
     private final ObjectMapper objectMapper;
 
     /**
+     * Used to create or update the local {@code User} row for whoever
+     * just finished logging in, from the claims the IDP returned -
+     * see {@link #syncLocalUser}.
+     */
+    private final AuthenticationService authenticationService;
+
+    /**
      * Creates the handler.
      *
-     * @param authorizedClientRepo the Spring-managed repository that
-     *                             holds the IDP-issued access token
-     *                             for the current login
-     * @param objectMapper         the application's auto-configured
-     *                             Jackson mapper, reused here instead
-     *                             of constructing a new one
+     * @param authorizedClientRepo  the Spring-managed repository that
+     *                              holds the IDP-issued access token
+     *                              for the current login
+     * @param objectMapper          the application's auto-configured
+     *                              Jackson mapper, reused here instead
+     *                              of constructing a new one
+     * @param authenticationService used to create or update the local
+     *                              {@code User} row on every
+     *                              successful login
      */
     public IdpTokenRelaySuccessHandler(
             OAuth2AuthorizedClientRepository authorizedClientRepo,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            AuthenticationService authenticationService) {
         this.authorizedClientRepo = authorizedClientRepo;
         this.objectMapper = objectMapper;
+        this.authenticationService = authenticationService;
     }
 
     /**
      * {@inheritDoc}
      *
-     * <p>Branches on {@link #API_LOGIN_SESSION_ATTRIBUTE} as
-     * described in the class-level documentation.
+     * <p>First creates or updates the local {@code User} row for the
+     * caller (see {@link #syncLocalUser}), regardless of which branch
+     * below is taken, then branches on
+     * {@link #API_LOGIN_SESSION_ATTRIBUTE} as described in the
+     * class-level documentation.
      */
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request,
             HttpServletResponse response, Authentication authentication)
             throws IOException, ServletException {
+
+        syncLocalUser(authentication);
 
         HttpSession session = request.getSession(false);
         boolean isApiLogin = session != null
@@ -182,6 +201,35 @@ public class IdpTokenRelaySuccessHandler
         session.removeAttribute(REDIRECT_TARGET_SESSION_ATTRIBUTE);
 
         relayIdpToken(request, response, authentication, redirectTarget);
+    }
+
+    /**
+     * Creates or updates the local {@code User} row for the caller,
+     * using the standard OIDC claims ({@code sub}, {@code email},
+     * {@code given_name}, {@code family_name}) that
+     * {@code oauth2Login()} already decoded from the IDP's ID token.
+     *
+     * <p>{@code oauth2Login()} only ever invokes this handler with an
+     * {@link OAuth2AuthenticationToken}, whose principal is an
+     * {@link OidcUser} as long as the client registration requests
+     * the {@code openid} scope (it does - see
+     * {@code application.properties}). The {@code instanceof} check
+     * is defensive rather than load-bearing: it lets this method do
+     * nothing, rather than throw, if that ever stops being true.
+     *
+     * @param authentication the freshly-authenticated login passed to
+     *                       {@link #onAuthenticationSuccess}
+     */
+    private void syncLocalUser(Authentication authentication) {
+        if (!(authentication.getPrincipal() instanceof OidcUser oidcUser)) {
+            return;
+        }
+
+        authenticationService.createOrUpdateUser(
+                oidcUser.getSubject(),
+                oidcUser.getEmail(),
+                oidcUser.getGivenName(),
+                oidcUser.getFamilyName());
     }
 
     /**
