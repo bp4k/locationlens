@@ -1,8 +1,10 @@
 package net.bp4k.locationlens.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -54,7 +56,7 @@ class AuthenticationServiceTest {
     void createOrUpdateUserCreatesNewUserWhenSubjectIsUnknown() {
         when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
 
-        User result = service.createOrUpdateUser(SUBJECT, EMAIL, "Ada", "Lovelace");
+        User result = service.createOrUpdateUser(SUBJECT, EMAIL, "Ada", "Lovelace", false);
 
         ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
         verify(userRepository).save(captor.capture());
@@ -70,7 +72,7 @@ class AuthenticationServiceTest {
         User existing = new User(USER_ID, "old@example.com", "Old Name");
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
 
-        User result = service.createOrUpdateUser(SUBJECT, EMAIL, "Ada", "Lovelace");
+        User result = service.createOrUpdateUser(SUBJECT, EMAIL, "Ada", "Lovelace", false);
 
         verify(userRepository).save(existing);
         assertSame(existing, result);
@@ -83,7 +85,7 @@ class AuthenticationServiceTest {
     void createOrUpdateUserTrimsDisplayNameWhenFamilyNameIsMissing() {
         when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
 
-        User result = service.createOrUpdateUser(SUBJECT, EMAIL, "Ada", null);
+        User result = service.createOrUpdateUser(SUBJECT, EMAIL, "Ada", null, false);
 
         assertEquals("Ada", result.getDisplayName());
     }
@@ -92,7 +94,7 @@ class AuthenticationServiceTest {
     void createOrUpdateUserTrimsDisplayNameWhenGivenNameIsMissing() {
         when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
 
-        User result = service.createOrUpdateUser(SUBJECT, EMAIL, null, "Lovelace");
+        User result = service.createOrUpdateUser(SUBJECT, EMAIL, null, "Lovelace", false);
 
         assertEquals("Lovelace", result.getDisplayName());
     }
@@ -101,7 +103,7 @@ class AuthenticationServiceTest {
     void createOrUpdateUserGivesEmptyDisplayNameWhenBothNamesMissing() {
         when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
 
-        User result = service.createOrUpdateUser(SUBJECT, EMAIL, null, null);
+        User result = service.createOrUpdateUser(SUBJECT, EMAIL, null, null, false);
 
         assertEquals("", result.getDisplayName());
     }
@@ -109,7 +111,7 @@ class AuthenticationServiceTest {
     @Test
     void createOrUpdateUserRejectsSubjectThatIsNotAUuid() {
         assertThrows(InvalidTokenException.class,
-                () -> service.createOrUpdateUser("not-a-uuid", EMAIL, "Ada", "Lovelace"));
+                () -> service.createOrUpdateUser("not-a-uuid", EMAIL, "Ada", "Lovelace", false));
 
         verifyNoInteractions(userRepository);
     }
@@ -117,9 +119,86 @@ class AuthenticationServiceTest {
     @Test
     void createOrUpdateUserRejectsNullSubject() {
         assertThrows(InvalidTokenException.class,
-                () -> service.createOrUpdateUser(null, EMAIL, "Ada", "Lovelace"));
+                () -> service.createOrUpdateUser(null, EMAIL, "Ada", "Lovelace", false));
 
         verify(userRepository, never()).save(any(User.class));
+    }
+
+    // ---- createOrUpdateUser: admin provisioning ----------------------------
+
+    @Test
+    void createOrUpdateUserSetsAdminTrueForNewUserWhenRoleIsPresent() {
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+
+        User result = service.createOrUpdateUser(SUBJECT, EMAIL, "Ada", "Lovelace", true);
+
+        assertEquals(Boolean.TRUE, result.getAdmin());
+    }
+
+    @Test
+    void createOrUpdateUserSetsAdminFalseForNewUserWhenRoleIsAbsent() {
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+
+        User result = service.createOrUpdateUser(SUBJECT, EMAIL, "Ada", "Lovelace", false);
+
+        assertEquals(Boolean.FALSE, result.getAdmin());
+    }
+
+    @Test
+    void createOrUpdateUserPromotesAnExistingNonAdminWhenRoleIsNowPresent() {
+        User existing = new User(USER_ID, EMAIL, "Ada Lovelace", false);
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
+
+        User result = service.createOrUpdateUser(SUBJECT, EMAIL, "Ada", "Lovelace", true);
+
+        assertEquals(Boolean.TRUE, result.getAdmin());
+    }
+
+    @Test
+    void createOrUpdateUserDemotesAnExistingAdminWhenRoleIsNoLongerPresent() {
+        User existing = new User(USER_ID, EMAIL, "Ada Lovelace", true);
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
+
+        User result = service.createOrUpdateUser(SUBJECT, EMAIL, "Ada", "Lovelace", false);
+
+        assertEquals(Boolean.FALSE, result.getAdmin());
+    }
+
+    // ---- isAdmin ------------------------------------------------------------
+
+    @Test
+    void isAdminReturnsTrueForAKnownAdmin() {
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(
+                new User(USER_ID, EMAIL, "Ada Lovelace", true)));
+
+        assertTrue(service.isAdmin(SUBJECT));
+    }
+
+    @Test
+    void isAdminReturnsFalseForAKnownNonAdmin() {
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(
+                new User(USER_ID, EMAIL, "Ada Lovelace", false)));
+
+        assertFalse(service.isAdmin(SUBJECT));
+    }
+
+    @Test
+    void isAdminReturnsFalseForAnUnknownUser() {
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+
+        assertFalse(service.isAdmin(SUBJECT));
+    }
+
+    @Test
+    void isAdminReturnsFalseForASubjectThatIsNotAUuid() {
+        assertFalse(service.isAdmin("not-a-uuid"));
+        verifyNoInteractions(userRepository);
+    }
+
+    @Test
+    void isAdminReturnsFalseForANullSubject() {
+        assertFalse(service.isAdmin(null));
+        verifyNoInteractions(userRepository);
     }
 
     // ---- requireAuthenticatedUser -----------------------------------------

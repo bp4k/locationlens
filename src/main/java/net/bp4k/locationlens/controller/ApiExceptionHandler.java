@@ -5,6 +5,7 @@ import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -43,6 +44,17 @@ public class ApiExceptionHandler {
     @ExceptionHandler(DuplicatePlaceException.class)
     public ResponseEntity<ErrorResponse> handleDuplicatePlace(DuplicatePlaceException e) {
         return build(HttpStatus.CONFLICT, e.getMessage());
+    }
+
+    /**
+     * Thrown by Spring Security's method security (e.g. an unmet
+     * {@code @PreAuthorize("hasRole('ADMIN')")}) when an authenticated
+     * caller lacks a required authority. Without this handler, Spring
+     * Security's default behavior is a bare {@code 403} with no body.
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException e) {
+        return build(HttpStatus.FORBIDDEN, "Administrator access is required");
     }
 
     private ResponseEntity<ErrorResponse> build(HttpStatus status, String message) {

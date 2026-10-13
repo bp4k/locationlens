@@ -10,13 +10,20 @@ All endpoints use the existing `/api/v1/**` bearer-token security chain.
 | POST | `/api/v1/business-claims/{claimId}/reject` | 204, no body | Administrator |
 
 Submission body: `{"placeId":"google-place-id"}`. The caller's user ID and
-reviewer's admin ID come from the validated JWT `sub`; clients cannot choose them.
-Blank or missing place IDs return 400. Missing authentication returns 401.
-Administrator operations return 403 unless the token has the Keycloak realm role
-`admin` in `realm_access.roles`. This is a draft convention: configure that realm
-role and include it in access tokens, or align this check with the team's eventual
-AuthenticationService. No administrator flag is currently configured according
-to requirements section 2.6; absent roles therefore deny access.
+reviewer's admin ID come from `AuthenticationService#requireAuthenticatedUser`
+(the authenticated caller's persisted `User.userId`), never from request JSON
+or a passed-in JWT. Blank or missing place IDs return 400. Missing
+authentication returns 401 (`InvalidTokenException`, mapped by
+`ApiExceptionHandler`).
+
+Administrator operations (`GET /pending`, the `approve`/`reject` endpoints)
+are marked `@PreAuthorize("hasRole('ADMIN')")` and return 403 unless the
+database's `User.admin` column is `true` for the caller - see
+`docs/securing-admin-endpoints.md` and `docs/admin-provisioning.md`. This
+replaced an earlier draft convention that read a Keycloak realm role
+(`admin`, in `realm_access.roles`) directly off the bearer token; the
+database is now the single source of truth used everywhere in this
+application, admin provisioning included.
 
 ## Integration still needed
 

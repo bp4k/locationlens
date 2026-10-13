@@ -5,17 +5,22 @@ import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.security.config.annotation.method.configuration
+    .EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders
     .HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration
     .EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.server.resource.authentication
+    .JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import static org.springframework.security.config.Customizer.withDefaults;
 
+import net.bp4k.locationlens.security.AdminAuthoritiesConverter;
 import net.bp4k.locationlens.security.IdpTokenRelaySuccessHandler;
 
 /**
@@ -32,6 +37,7 @@ import net.bp4k.locationlens.security.IdpTokenRelaySuccessHandler;
  */
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 public class SecurityConfig {
 
     /**
@@ -58,17 +64,37 @@ public class SecurityConfig {
      * signature, issuer, and expiry - no custom filter or decoder
      * needs to be written for this application.
      *
-     * @param http the builder Spring Security supplies for
-     *             configuring this chain
+     * <p>The JWT's granted authorities are derived by
+     * {@link AdminAuthoritiesConverter}, a fresh, per-request database
+     * lookup of admin status (see its Javadoc) rather than anything
+     * read off the token itself. That authority is what lets any
+     * method here, or on any other {@code /api/v1/**} controller,
+     * require admin access with
+     * {@code @PreAuthorize("hasRole('ADMIN')")} - enabled by
+     * {@code @EnableMethodSecurity} on this class - instead of
+     * hand-rolling its own check.
+     *
+     * @param http                      the builder Spring Security
+     *                                  supplies for configuring this
+     *                                  chain
+     * @param adminAuthoritiesConverter derives {@code ROLE_ADMIN} from
+     *                                  the database for the caller's
+     *                                  validated token
      * @return the fully configured chain for {@code /api/v1/**}
      * @throws Exception propagated from the underlying
      *                    {@code HttpSecurity} builder methods
      */
     @Bean
     @Order(1)
-    SecurityFilterChain apiSecurityFilterChain(HttpSecurity http)
+    SecurityFilterChain apiSecurityFilterChain(HttpSecurity http,
+            AdminAuthoritiesConverter adminAuthoritiesConverter)
             throws Exception {
-        return http 
+        JwtAuthenticationConverter jwtAuthenticationConverter =
+                new JwtAuthenticationConverter();
+        jwtAuthenticationConverter.setJwtGrantedAuthoritiesConverter(
+                adminAuthoritiesConverter);
+
+        return http
             .securityMatcher("/api/v1/**")
             .cors(withDefaults())
             .sessionManagement(session -> session.sessionCreationPolicy(
@@ -82,7 +108,8 @@ public class SecurityConfig {
                 // already-verified bearer access token.
                 auth.anyRequest().authenticated();
             })
-            .oauth2ResourceServer(oauth2 -> oauth2.jwt(withDefaults()))
+            .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt
+                    .jwtAuthenticationConverter(jwtAuthenticationConverter)))
             .build();
     }
 

@@ -5,7 +5,7 @@ import org.springframework.web.bind.annotation.RestController;
 import net.bp4k.locationlens.dto.ReviewRequest;
 import net.bp4k.locationlens.dto.ReviewResponse;
 import net.bp4k.locationlens.entity.Review;
-import net.bp4k.locationlens.exception.InvalidTokenException;
+import net.bp4k.locationlens.service.AuthenticationService;
 import net.bp4k.locationlens.service.ReviewService;
 
 import org.springframework.web.bind.annotation.PostMapping;
@@ -17,32 +17,29 @@ import java.util.List;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 
 
 
-@RestController 
+@RestController
 @RequestMapping("/api/v1/reviews")
 public class ReviewController {
-    
+
     private final ReviewService reviewService;
-    /**
-     * 
-     */
-     public ReviewController(ReviewService reviewService) {
+    private final AuthenticationService authenticationService;
+
+    public ReviewController(ReviewService reviewService,
+            AuthenticationService authenticationService) {
         this.reviewService = reviewService;
+        this.authenticationService = authenticationService;
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public ReviewResponse submitReview(
-            @AuthenticationPrincipal Jwt jwt,
-            @RequestBody @Validated ReviewRequest submission) {
-        UUID userId = currentUserId(jwt);
+    public ReviewResponse submitReview(@RequestBody @Validated ReviewRequest submission) {
+        UUID userId = authenticationService.requireAuthenticatedUser().getUserId();
         Review saved = reviewService.submitReview(
                 userId,
                 submission.placeId(),
@@ -57,17 +54,8 @@ public class ReviewController {
     }
 
     @GetMapping("/history")
-    public List<ReviewResponse> getUserReviewHistory(
-            @AuthenticationPrincipal Jwt jwt) {
-        UUID userId = currentUserId(jwt);
+    public List<ReviewResponse> getUserReviewHistory() {
+        UUID userId = authenticationService.requireAuthenticatedUser().getUserId();
         return reviewService.getReviewHistory(userId).stream().map(ReviewResponse::from).toList();
-    }
-
-    private UUID currentUserId(Jwt jwt) {
-        try {
-            return UUID.fromString(jwt.getSubject());
-        } catch (IllegalArgumentException | NullPointerException e) {
-            throw new InvalidTokenException("Token subject is not a valid user id");
-        }
     }
 }

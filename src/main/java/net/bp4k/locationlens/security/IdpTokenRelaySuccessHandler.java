@@ -5,6 +5,8 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Collection;
+import java.util.Map;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -115,6 +117,16 @@ public class IdpTokenRelaySuccessHandler
             "net.bp4k.locationlens.API_LOGIN_REDIRECT_TARGET";
 
     /**
+     * The Keycloak realm role that marks a user as an admin. Checked
+     * against the {@code realm_access.roles} claim on every login -
+     * see {@link #syncLocalUser}. The database's {@code User.admin}
+     * column, not this claim, is the source of truth once a request
+     * is underway; this is only where that column gets (re)set.
+     */
+    private static final String LOCATIONLENS_ADMIN_ROLE =
+            "locationlens_admin";
+
+    /**
      * Repository Spring Security already maintains for every OAuth2
      * client login; it holds the actual {@link OAuth2AccessToken}
      * (and refresh token, if any) that the IDP issued. We read from
@@ -217,6 +229,14 @@ public class IdpTokenRelaySuccessHandler
      * is defensive rather than load-bearing: it lets this method do
      * nothing, rather than throw, if that ever stops being true.
      *
+     * <p>Also determines admin status from the {@code realm_access
+     * .roles} claim and passes it to {@code createOrUpdateUser},
+     * which (re)writes it to the database on every login - see
+     * {@link #LOCATIONLENS_ADMIN_ROLE}. This claim must be present on
+     * the ID token for this to work: Keycloak only includes realm
+     * roles in a token when the client's {@code roles} client scope
+     * mapper has "Add to ID token" enabled.
+     *
      * @param authentication the freshly-authenticated login passed to
      *                       {@link #onAuthenticationSuccess}
      */
@@ -229,7 +249,24 @@ public class IdpTokenRelaySuccessHandler
                 oidcUser.getSubject(),
                 oidcUser.getEmail(),
                 oidcUser.getGivenName(),
-                oidcUser.getFamilyName());
+                oidcUser.getFamilyName(),
+                hasLocationlensAdminRole(oidcUser));
+    }
+
+    /**
+     * Checks whether {@code oidcUser}'s {@code realm_access.roles}
+     * claim contains {@link #LOCATIONLENS_ADMIN_ROLE}, mirroring the
+     * shape Keycloak gives that claim: a top-level object with a
+     * {@code roles} array, e.g. {@code {"roles": ["locationlens_admin"]}}.
+     *
+     * @param oidcUser the OIDC principal to inspect
+     * @return whether the admin role is present
+     */
+    private static boolean hasLocationlensAdminRole(OidcUser oidcUser) {
+        Object realmAccess = oidcUser.getClaims().get("realm_access");
+        return realmAccess instanceof Map<?, ?> access
+                && access.get("roles") instanceof Collection<?> roles
+                && roles.contains(LOCATIONLENS_ADMIN_ROLE);
     }
 
     /**

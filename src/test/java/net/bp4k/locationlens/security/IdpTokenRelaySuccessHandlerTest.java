@@ -1,6 +1,8 @@
 package net.bp4k.locationlens.security;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 
 import jakarta.servlet.http.HttpSession;
 
@@ -30,7 +32,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -139,7 +143,7 @@ class IdpTokenRelaySuccessHandlerTest {
 
         verify(authenticationService).createOrUpdateUser(
                 "11111111-1111-1111-1111-111111111111",
-                "jane@example.com", "Jane", "Doe");
+                "jane@example.com", "Jane", "Doe", false);
     }
 
     @Test
@@ -161,7 +165,80 @@ class IdpTokenRelaySuccessHandlerTest {
         handler.onAuthenticationSuccess(request, response, authentication);
 
         verify(authenticationService, never()).createOrUpdateUser(
-                any(), any(), any(), any());
+                any(), any(), any(), any(), anyBoolean());
+    }
+
+    @Test
+    @DisplayName("a login whose realm_access.roles includes"
+            + " locationlens_admin is synced with admin=true")
+    void syncsAdminTrueWhenLocationlensAdminRoleIsPresent()
+            throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        request.getSession(true);
+
+        AuthenticationService authenticationService =
+                mock(AuthenticationService.class);
+        IdpTokenRelaySuccessHandler handler =
+                newHandler(authenticationService);
+        OAuth2AuthenticationToken authentication = oidcAuthentication(
+                "11111111-1111-1111-1111-111111111111",
+                "jane@example.com", "Jane", "Doe",
+                List.of("locationlens_admin"));
+
+        handler.onAuthenticationSuccess(request, response, authentication);
+
+        verify(authenticationService).createOrUpdateUser(
+                "11111111-1111-1111-1111-111111111111",
+                "jane@example.com", "Jane", "Doe", true);
+    }
+
+    @Test
+    @DisplayName("a login whose realm_access.roles does not include"
+            + " locationlens_admin is synced with admin=false")
+    void syncsAdminFalseWhenLocationlensAdminRoleIsAbsent()
+            throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        request.getSession(true);
+
+        AuthenticationService authenticationService =
+                mock(AuthenticationService.class);
+        IdpTokenRelaySuccessHandler handler =
+                newHandler(authenticationService);
+        OAuth2AuthenticationToken authentication = oidcAuthentication(
+                "11111111-1111-1111-1111-111111111111",
+                "jane@example.com", "Jane", "Doe",
+                List.of("some-other-role"));
+
+        handler.onAuthenticationSuccess(request, response, authentication);
+
+        verify(authenticationService).createOrUpdateUser(
+                "11111111-1111-1111-1111-111111111111",
+                "jane@example.com", "Jane", "Doe", false);
+    }
+
+    @Test
+    @DisplayName("a login whose claims have no realm_access at all is"
+            + " synced with admin=false, not an exception")
+    void syncsAdminFalseWhenRealmAccessClaimIsAbsent() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        request.getSession(true);
+
+        AuthenticationService authenticationService =
+                mock(AuthenticationService.class);
+        IdpTokenRelaySuccessHandler handler =
+                newHandler(authenticationService);
+        OAuth2AuthenticationToken authentication = oidcAuthentication();
+        OidcUser oidcUser = mock(OidcUser.class);
+        when(oidcUser.getClaims()).thenReturn(Map.of());
+        when(authentication.getPrincipal()).thenReturn(oidcUser);
+
+        handler.onAuthenticationSuccess(request, response, authentication);
+
+        verify(authenticationService).createOrUpdateUser(
+                any(), any(), any(), any(), eq(false));
     }
 
     @Test
@@ -283,7 +360,9 @@ class IdpTokenRelaySuccessHandlerTest {
     /**
      * Same as {@link #oidcAuthentication()}, but with its principal
      * stubbed as an {@link OidcUser} carrying the given standard OIDC
-     * claims, for tests that verify the local-user-sync behavior.
+     * claims and no realm roles, for tests that verify the
+     * local-user-sync behavior but are not themselves about admin
+     * provisioning.
      *
      * @param subject    the {@code sub} claim
      * @param email      the {@code email} claim
@@ -294,12 +373,35 @@ class IdpTokenRelaySuccessHandlerTest {
     private static OAuth2AuthenticationToken oidcAuthentication(
             String subject, String email, String givenName,
             String familyName) {
+        return oidcAuthentication(subject, email, givenName, familyName,
+                List.of());
+    }
+
+    /**
+     * Same as {@link #oidcAuthentication(String, String, String,
+     * String)}, but also stubs the principal's {@code realm_access
+     * .roles} claim to {@code realmRoles}, matching the shape
+     * Keycloak gives that claim.
+     *
+     * @param subject    the {@code sub} claim
+     * @param email      the {@code email} claim
+     * @param givenName  the {@code given_name} claim
+     * @param familyName the {@code family_name} claim
+     * @param realmRoles the {@code realm_access.roles} claim's
+     *                   contents
+     * @return the authentication token
+     */
+    private static OAuth2AuthenticationToken oidcAuthentication(
+            String subject, String email, String givenName,
+            String familyName, List<String> realmRoles) {
         OAuth2AuthenticationToken authentication = oidcAuthentication();
         OidcUser oidcUser = mock(OidcUser.class);
         when(oidcUser.getSubject()).thenReturn(subject);
         when(oidcUser.getEmail()).thenReturn(email);
         when(oidcUser.getGivenName()).thenReturn(givenName);
         when(oidcUser.getFamilyName()).thenReturn(familyName);
+        when(oidcUser.getClaims()).thenReturn(
+                Map.of("realm_access", Map.of("roles", realmRoles)));
         when(authentication.getPrincipal()).thenReturn(oidcUser);
         return authentication;
     }
