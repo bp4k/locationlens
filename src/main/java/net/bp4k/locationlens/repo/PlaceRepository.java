@@ -39,6 +39,20 @@ public interface PlaceRepository extends JpaRepository<Place, String> {
     List<Place> findByNameContainingIgnoreCase(String name);
 
     /**
+     * Finds places with exactly the given name, address, latitude and longitude.
+     * {@code types} is not part of this query, since Spring Data cannot derive
+     * set equality against an {@code @ElementCollection}; callers that also need
+     * to match on types should filter the result in memory.
+     * @param name the exact place name
+     * @param address the exact place address
+     * @param latitude the exact latitude
+     * @param longitude the exact longitude
+     * @return places matching every given field exactly
+     */
+    List<Place> findByNameAndAddressAndLatitudeAndLongitude(
+            String name, String address, Double latitude, Double longitude);
+
+    /**
      * Finds places matching the (AND-combined) conditions below. Each group of
      * parameters is ignored entirely when every parameter within it is {@code null}:
      * <ul>
