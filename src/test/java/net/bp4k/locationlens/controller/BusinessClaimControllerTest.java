@@ -56,6 +56,7 @@ class BusinessClaimControllerTest {
 
     private MockMvc mvc(Jwt jwt) {
         return MockMvcBuilders.standaloneSetup(controller)
+                .setControllerAdvice(new ApiExceptionHandler())
                 .setCustomArgumentResolvers(new HandlerMethodArgumentResolver() {
                     public boolean supportsParameter(MethodParameter parameter) {
                         return parameter.getParameterType() == Jwt.class;
@@ -66,6 +67,17 @@ class BusinessClaimControllerTest {
                         return jwt;
                     }
                 }).build();
+    }
+
+    @Test
+    void verificationFailureIncludesAnActionableMessage() throws Exception {
+        when(service.submitClaim("user-123", "missing"))
+                .thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Selected business place was not found"));
+        mvc(user()).perform(post("/api/v1/business-claims")
+                .contentType(MediaType.APPLICATION_JSON).content("{\"placeId\":\"missing\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Selected business place was not found"));
     }
 
     @Test

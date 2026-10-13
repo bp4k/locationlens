@@ -19,16 +19,18 @@ import net.bp4k.locationlens.repo.BusinessClaimRepository;
  * The controller authenticates callers and checks the administrator role.
  * User/admin IDs are Keycloak subject UUIDs, as in User and Review. Storing
  * subjects directly follows ReviewService and does not require a local user
- * record to have been provisioned. Place lookup is not yet available, so this
- * service validates the place ID's format but not ownership or existence.
+ * record to have been provisioned. The provider verifies the business exists
+ * before a claim is saved; administrators still verify ownership.
  */
 @Service
 @Transactional
 public class BusinessClaimService {
     private final BusinessClaimRepository claimRepository;
+    private final BusinessPlaceLookup placeLookup;
 
-    public BusinessClaimService(BusinessClaimRepository claimRepository) {
+    public BusinessClaimService(BusinessClaimRepository claimRepository, BusinessPlaceLookup placeLookup) {
         this.claimRepository = claimRepository;
+        this.placeLookup = placeLookup;
     }
 
     public BusinessClaimRequest submitClaim(String userId, String placeId) {
@@ -37,7 +39,8 @@ public class BusinessClaimService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "placeId must contain between 1 and 255 characters");
         }
-        BusinessClaim claim = new BusinessClaim(UUID.randomUUID(), subject, placeId, Instant.now());
+        String verifiedPlaceId = placeLookup.requireBusinessPlace(placeId);
+        BusinessClaim claim = new BusinessClaim(UUID.randomUUID(), subject, verifiedPlaceId, Instant.now());
         return response(claimRepository.saveAndFlush(claim));
     }
 
