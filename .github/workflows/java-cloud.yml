@@ -48,8 +48,10 @@ jobs:
                 exit 1
                 fi
                 if mysql --protocol=TCP --host=127.0.0.1 \
-                --port=3306 --connect-timeout=5 --user="$DB_USER" \
-                --database="$DB_NAME" --execute="SELECT 1 AS connection_ok;"
+                    --port=3306 --connect-timeout=5 \
+                    --ssl-mode=DISABLED --get-server-public-key \
+                    --user="$DB_USER" --database="$DB_NAME" \
+                    --execute="SELECT 1 AS connection_ok;"
                 then
                 echo "Cloud SQL connection verified."
                 exit 0
