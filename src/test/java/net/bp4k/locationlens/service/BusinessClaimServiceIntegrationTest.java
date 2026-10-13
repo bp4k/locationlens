@@ -34,8 +34,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import jakarta.persistence.EntityManagerFactory;
 import net.bp4k.locationlens.controller.BusinessClaimController;
+import net.bp4k.locationlens.dto.BusinessClaimRequest;
 import net.bp4k.locationlens.entity.BusinessClaim;
-import net.bp4k.locationlens.model.BusinessClaimRequest;
 import net.bp4k.locationlens.model.ClaimStatus;
 import net.bp4k.locationlens.repo.BusinessClaimRepository;
 

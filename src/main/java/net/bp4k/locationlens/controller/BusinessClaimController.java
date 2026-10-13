@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
-import net.bp4k.locationlens.model.BusinessClaimRequest;
+import net.bp4k.locationlens.dto.BusinessClaimRequest;
 import net.bp4k.locationlens.service.BusinessClaimService;
 
 /**
