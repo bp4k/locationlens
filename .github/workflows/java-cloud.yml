@@ -1,0 +1,63 @@
+name: Check Cloud SQL Connection 
+
+on:
+    workflow_dispatch: 
+
+permissions: 
+    contents: read 
+
+jobs: 
+    connection-check:
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        steps:
+        - name: Authenticate to Google Cloud
+          uses: google-github-actions/auth@v2
+          with:
+            credentials_json: ${{ secrets.GCP_SA_KEY }}
+        - name: Install MySQL Client and Proxy
+          run: |
+            sudo apt-get update
+            sudo apt-get install -y default-mysql-client
+            curl --fail --location \
+                https://github.com/GoogleCloudPlatform/cloud-sql-proxy/releases/latest/download/cloud-sql-proxy.linux.amd64 \
+                --output cloud-sql-proxy
+            chmod +x cloud-sql-proxy
+        - name: Verify Database Connection
+          env:
+            INSTANCE: ${{ vars.CLOUD_SQL_INSTANCE }}
+            DB_NAME: ${{ vars.CI_DB_NAME }}
+            DB_USER: ${{ secrets.CI_DB_USERNAME }}
+            MYSQL_PWD: ${{ secrets.CI_DB_PASSWORD }}
+          run: |
+            set -euo pipefail
+            : "${INSTANCE:?Missing CLOUD_SQL_INSTANCE}"
+            : "${DB_NAME:?Missing CI_DB_NAME}"
+            : "${DB_USER:?Missing CI_DB_USERNAME}"
+            : "${MYSQL_PWD:?Missing CI_DB_PASSWORD}"
+
+            ./cloud-sql-proxy "$INSTANCE" \
+                --address 127.0.0.1 --port 3306 > proxy.log 2>&1 &
+            proxy_pid=$!
+            trap 'kill "$proxy_pid" 2>/dev/null || true' EXIT
+
+            for attempt in {1..12}; do
+                if ! kill -0 "$proxy_pid" 2>/dev/null; then
+                cat proxy.log
+                exit 1
+                fi
+                if mysql --protocol=TCP --host=127.0.0.1 \
+                --port=3306 --connect-timeout=5 --user="$DB_USER" \
+                --database="$DB_NAME" --execute="SELECT 1 AS connection_ok;"
+                then
+                echo "Cloud SQL connection verified."
+                exit 0
+                fi
+                sleep 3
+            done
+
+            cat proxy.log
+            exit 1
+
+            
+        

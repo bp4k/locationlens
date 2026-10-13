@@ -11,8 +11,8 @@ import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
+import net.bp4k.locationlens.dto.BusinessClaimRequest;
 import net.bp4k.locationlens.entity.BusinessClaim;
-import net.bp4k.locationlens.model.BusinessClaimRequest;
 import net.bp4k.locationlens.model.ClaimStatus;
 import net.bp4k.locationlens.repo.BusinessClaimRepository;
 

@@ -17,7 +17,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.http.MediaType;
 
-import net.bp4k.locationlens.model.BusinessClaimRequest;
+import net.bp4k.locationlens.dto.BusinessClaimRequest;
 import net.bp4k.locationlens.model.ClaimStatus;
 import net.bp4k.locationlens.service.BusinessClaimService;
 
