@@ -51,6 +51,7 @@ jobs:
           IDP_CLIENT_ID: ${{ secrets.IDP_CLIENT_ID || vars.IDP_CLIENT_ID }}
           IDP_CLIENT_SECRET: ${{ secrets.IDP_CLIENT_SECRET }}
           VALID_REDIRECTS: ${{ secrets.VALID_REDIRECTS || vars.VALID_REDIRECTS }}
+          GOOGLE_PLACES_API_KEY: ${{ secrets.GOOGLE_PLACES_API_KEY }}
         run: ruby .github/scripts/prepare-appengine.rb
 
       - name: Authenticate to Google Cloud

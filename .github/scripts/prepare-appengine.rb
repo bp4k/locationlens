@@ -14,6 +14,7 @@ database = required_setting("CI_DB_NAME").strip
 runtime_account = required_setting("GCP_RUNTIME_SERVICE_ACCOUNT").strip
 issuer = required_setting("IDP_URI").strip
 
+
 abort "CLOUD_SQL_INSTANCE must be project:region:instance in GCP_PROJECT_ID" unless
   instance.match?(/\A#{Regexp.escape(project)}:[a-z0-9-]+:[a-z0-9-]+\z/)
 abort "CI_DB_NAME must contain only letters, numbers, or underscores" unless
@@ -41,6 +42,7 @@ config["env_variables"] = config.fetch("env_variables", {}).merge(
   "IDP_CLIENT_ID" => required_setting("IDP_CLIENT_ID"),
   "IDP_CLIENT_SECRET" => required_setting("IDP_CLIENT_SECRET"),
   "VALID_REDIRECTS" => required_setting("VALID_REDIRECTS"),
+  "GOOGLE_PLACES_API_KEY" => required_setting("GOOGLE_PLACES_API_KEY"),
   "FLYWAY_ENABLED" => "true",
   "DDL_AUTO" => "validate"
 )
