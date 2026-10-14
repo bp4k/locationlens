@@ -95,12 +95,15 @@ class BusinessClaimControllerTest {
     }
 
     private MockMvc mvc() {
-        return MockMvcBuilders.standaloneSetup(controller).build();
+        return MockMvcBuilders.standaloneSetup(controller)
+                .setControllerAdvice(new ApiExceptionHandler())
+                .build();
     }
 
     @Test
     void verificationFailureIncludesAnActionableMessage() throws Exception {
-        when(service.submitClaim("user-123", "missing"))
+        when(authenticationService.requireAuthenticatedUser()).thenReturn(ordinaryUser());
+        when(service.submitClaim(USER_ID.toString(), "missing"))
                 .thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Selected business place was not found"));
         mvc().perform(post("/api/v1/business-claims")
