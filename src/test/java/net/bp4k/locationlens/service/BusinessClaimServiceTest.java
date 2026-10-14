@@ -26,11 +26,14 @@ class BusinessClaimServiceTest {
     private static final UUID CLAIM_ID = UUID.fromString("c952a1c9-1384-4571-8c53-7eeeb4975329");
     private BusinessClaimRepository repository;
     private BusinessClaimService service;
+    private BusinessPlaceLookup placeLookup;
 
     @BeforeEach
     void setUp() {
         repository = mock(BusinessClaimRepository.class);
-        service = new BusinessClaimService(repository);
+        placeLookup = mock(BusinessPlaceLookup.class);
+        when(placeLookup.requireBusinessPlace(any())).thenAnswer(call -> call.getArgument(0));
+        service = new BusinessClaimService(repository, placeLookup);
     }
 
     private static BusinessClaim pending() {
@@ -78,6 +81,30 @@ class BusinessClaimServiceTest {
             assertStatus(HttpStatus.BAD_REQUEST, () -> service.submitClaim(USER_ID.toString(), placeId));
         }
         verifyNoInteractions(repository);
+        verifyNoInteractions(placeLookup);
+    }
+
+    @Test
+    void nonexistentBusinessNeverCreatesAClaim() {
+        when(placeLookup.requireBusinessPlace("missing"))
+                .thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "Not found"));
+        assertStatus(HttpStatus.NOT_FOUND, () -> service.submitClaim(USER_ID.toString(), "missing"));
+        verifyNoInteractions(repository);
+    }
+
+    @Test
+    void unavailableLookupNeverCreatesAClaim() {
+        when(placeLookup.requireBusinessPlace("place-1"))
+                .thenThrow(new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Unavailable"));
+        assertStatus(HttpStatus.SERVICE_UNAVAILABLE, () -> service.submitClaim(USER_ID.toString(), "place-1"));
+        verifyNoInteractions(repository);
+    }
+
+    @Test
+    void storesTheCanonicalVerifiedPlaceId() {
+        when(placeLookup.requireBusinessPlace("old-id")).thenReturn("canonical-id");
+        when(repository.saveAndFlush(any(BusinessClaim.class))).thenAnswer(call -> call.getArgument(0));
+        assertEquals("canonical-id", service.submitClaim(USER_ID.toString(), "old-id").placeId());
     }
 
     @Test

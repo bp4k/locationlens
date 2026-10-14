@@ -56,6 +56,10 @@ class BusinessClaimServiceIntegrationTest {
     @Import({BusinessClaimService.class, BusinessClaimController.class})
     static class DatabaseConfig {
         @Bean
+        BusinessPlaceLookup placeLookup() {
+            return placeId -> placeId;
+        }
+        @Bean
         DataSource dataSource() {
             return new DriverManagerDataSource("jdbc:h2:mem:claim-tests;DB_CLOSE_DELAY=-1;"
                     + "LOCK_TIMEOUT=5000", "sa", "");
