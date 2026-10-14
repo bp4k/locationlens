@@ -11,8 +11,6 @@ import jakarta.servlet.http.HttpSession;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -22,6 +20,7 @@ import tools.jackson.databind.ObjectMapper;
 import net.bp4k.locationlens.dto.ErrorResponse;
 import net.bp4k.locationlens.dto.MeResponse;
 import net.bp4k.locationlens.security.IdpTokenRelaySuccessHandler;
+import net.bp4k.locationlens.service.AuthenticationService;
 
 /**
  * Exposes the two REST endpoints this application adds on top of the
@@ -72,23 +71,35 @@ public class AuthController {
     private final ObjectMapper objectMapper;
 
     /**
+     * Used by {@link #me} to resolve the caller's persisted
+     * {@code User} row.
+     */
+    private final AuthenticationService authenticationService;
+
+    /**
      * Creates the controller.
      *
-     * @param redirectUriConfig the raw, comma-separated
-     *                          {@code net.bp4k.locationlens
-     *                          .redirect-uri} property value; blank
-     *                          or absent means no {@code target} will
-     *                          ever be accepted
-     * @param objectMapper      the application's auto-configured
-     *                          Jackson mapper, reused here instead of
-     *                          constructing a new one
+     * @param redirectUriConfig    the raw, comma-separated
+     *                             {@code net.bp4k.locationlens
+     *                             .redirect-uri} property value;
+     *                             blank or absent means no
+     *                             {@code target} will ever be
+     *                             accepted
+     * @param objectMapper         the application's auto-configured
+     *                             Jackson mapper, reused here instead
+     *                             of constructing a new one
+     * @param authenticationService used to resolve the caller's
+     *                             persisted {@code User} row in
+     *                             {@link #me}
      */
     public AuthController(
             @Value("${net.bp4k.locationlens.redirect-uri:}")
             String redirectUriConfig,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            AuthenticationService authenticationService) {
         this.allowedRedirectUris = parseAllowedRedirectUris(redirectUriConfig);
         this.objectMapper = objectMapper;
+        this.authenticationService = authenticationService;
     }
 
     /**
@@ -189,26 +200,26 @@ public class AuthController {
     /**
      * Returns the authenticated caller's profile.
      *
-     * <p>{@code jwt} is resolved by Spring Security's standard
-     * {@code @AuthenticationPrincipal} support: by the time this
-     * method runs, the {@code apiSecurityFilterChain}'s
-     * {@code oauth2ResourceServer(oauth2 -> oauth2.jwt(...))}
-     * configuration has already verified the caller's
-     * {@code Authorization: Bearer <token>} header against the IDP's
-     * published signing keys (its JWKS) and rejected the request with
-     * {@code 401 Unauthorized} if it was missing, expired, or
-     * otherwise invalid - this method only ever sees a token that is
-     * already known to be genuine.
+     * <p>By the time this method runs, the
+     * {@code apiSecurityFilterChain}'s {@code
+     * oauth2ResourceServer(oauth2 -> oauth2.jwt(...))} configuration
+     * has already verified the caller's
+     * {@code Authorization: Bearer <token>} header and populated the
+     * request's {@code SecurityContext} - rejecting the request with
+     * {@code 401 Unauthorized} first if it was missing, expired, or
+     * otherwise invalid. {@link AuthenticationService
+     * #requireAuthenticatedUser} reads that context to resolve the
+     * caller's persisted {@code User} row (rather than reading claims
+     * directly off the bearer token, as this method previously did),
+     * so the response reflects what {@link
+     * AuthenticationService#createOrUpdateUser} last saved for this
+     * user, including any first/last name split.
      *
-     * @param jwt the caller's validated access token
-     * @return the caller's first name, last name, and email, read
-     *         directly from the token's standard OIDC claims
+     * @return the caller's profile, built from their persisted
+     *         {@code User} row
      */
     @GetMapping("/api/v1/me")
-    public MeResponse me(@AuthenticationPrincipal Jwt jwt) {
-        return new MeResponse(
-                jwt.getClaimAsString("given_name"),
-                jwt.getClaimAsString("family_name"),
-                jwt.getClaimAsString("email"));
+    public MeResponse me() {
+        return MeResponse.from(authenticationService.requireAuthenticatedUser());
     }
 }

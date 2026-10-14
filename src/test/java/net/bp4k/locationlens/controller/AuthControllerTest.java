@@ -13,11 +13,18 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import tools.jackson.databind.json.JsonMapper;
 
 import net.bp4k.locationlens.dto.ErrorResponse;
+import net.bp4k.locationlens.dto.MeResponse;
+import net.bp4k.locationlens.entity.User;
 import net.bp4k.locationlens.security.IdpTokenRelaySuccessHandler;
+import net.bp4k.locationlens.service.AuthenticationService;
+
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Unit tests for {@link AuthController#login}, covering the
@@ -54,8 +61,12 @@ class AuthControllerTest {
     private static final String REDIRECT_URI_CONFIG =
             ALLOWED_HTTP_TARGET + "," + ALLOWED_CUSTOM_SCHEME_TARGET;
 
+    private final AuthenticationService authenticationService =
+            mock(AuthenticationService.class);
+
     private final AuthController controller = new AuthController(
-            REDIRECT_URI_CONFIG, JsonMapper.builder().build());
+            REDIRECT_URI_CONFIG, JsonMapper.builder().build(),
+            authenticationService);
 
     @Test
     @DisplayName("a target absent from the allow-list is rejected"
@@ -141,6 +152,52 @@ class AuthControllerTest {
         HttpSession session = request.getSession(false);
         assertNull(session.getAttribute(IdpTokenRelaySuccessHandler
                 .REDIRECT_TARGET_SESSION_ATTRIBUTE));
+    }
+
+    @Test
+    @DisplayName("me() right-splits a three-part display name into a"
+            + " two-word first name and a one-word last name")
+    void meRightSplitsThreePartDisplayName() {
+        when(authenticationService.requireAuthenticatedUser())
+                .thenReturn(new User(UUID.randomUUID(), "mary@example.com",
+                        "Mary Anne Rose"));
+
+        MeResponse response = controller.me();
+
+        assertEquals("Mary Anne", response.firstName());
+        assertEquals("Rose", response.lastName());
+        assertEquals("Mary Anne Rose", response.fullName());
+        assertEquals("mary@example.com", response.email());
+    }
+
+    @Test
+    @DisplayName("me() treats a single-word display name entirely as"
+            + " the first name, with an empty last name")
+    void meTreatsSingleWordDisplayNameAsFirstNameOnly() {
+        when(authenticationService.requireAuthenticatedUser())
+                .thenReturn(new User(UUID.randomUUID(), "john@example.com",
+                        "John"));
+
+        MeResponse response = controller.me();
+
+        assertEquals("John", response.firstName());
+        assertEquals("", response.lastName());
+        assertEquals("John", response.fullName());
+    }
+
+    @Test
+    @DisplayName("me() splits a two-word display name into a"
+            + " one-word first name and a one-word last name")
+    void meSplitsTwoWordDisplayNameIntoFirstAndLastName() {
+        when(authenticationService.requireAuthenticatedUser())
+                .thenReturn(new User(UUID.randomUUID(), "john@example.com",
+                        "John Barclays"));
+
+        MeResponse response = controller.me();
+
+        assertEquals("John", response.firstName());
+        assertEquals("Barclays", response.lastName());
+        assertEquals("John Barclays", response.fullName());
     }
 
     /**
