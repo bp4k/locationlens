@@ -22,6 +22,11 @@ import static org.springframework.security.config.Customizer.withDefaults;
 
 import net.bp4k.locationlens.security.AdminAuthoritiesConverter;
 import net.bp4k.locationlens.security.IdpTokenRelaySuccessHandler;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClientManager;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClientProviderBuilder;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizedClientManager;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository;
 
 /**
  * Wires up two independent {@link SecurityFilterChain}s so that a
@@ -103,7 +108,7 @@ public class SecurityConfig {
             .authorizeHttpRequests((auth) -> {
                 // Starting a login must be reachable by a caller who
                 // is not authenticated yet.
-                auth.requestMatchers("/api/v1/login").permitAll();
+                auth.requestMatchers("/api/v1/login", "/api/v1/session/refresh").permitAll();
                 // Every other /api/v1/** endpoint requires a valid,
                 // already-verified bearer access token.
                 auth.anyRequest().authenticated();
@@ -158,7 +163,15 @@ public class SecurityConfig {
      * safer in production
      */
     @Bean
-    public UrlBasedCorsConfigurationSource corsConfigurationSource() {
+    public OAuth2AuthorizedClientManager authorizedClientManager(
+            ClientRegistrationRepository registrations, OAuth2AuthorizedClientRepository clients) {
+        DefaultOAuth2AuthorizedClientManager manager = new DefaultOAuth2AuthorizedClientManager(registrations, clients);
+        manager.setAuthorizedClientProvider(OAuth2AuthorizedClientProviderBuilder.builder().refreshToken().build());
+        return manager;
+    }
+
+    @Bean
+    public UrlBasedCorsConfigurationSource corsConfigurationSource(FrontendOrigins frontendOrigins) {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(List.of("*"));
         config.setAllowedMethods(
@@ -167,6 +180,12 @@ public class SecurityConfig {
 
         UrlBasedCorsConfigurationSource source 
             = new UrlBasedCorsConfigurationSource();
+        CorsConfiguration session = new CorsConfiguration();
+        session.setAllowedOrigins(frontendOrigins.values());
+        session.setAllowedMethods(List.of("POST"));
+        session.setAllowedHeaders(List.of("Content-Type"));
+        session.setAllowCredentials(true);
+        source.registerCorsConfiguration("/api/v1/session/refresh", session);
         source.registerCorsConfiguration("/**", config);
         return source;
     }

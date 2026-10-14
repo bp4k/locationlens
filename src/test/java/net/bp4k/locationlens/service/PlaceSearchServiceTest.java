@@ -34,7 +34,7 @@ class PlaceSearchServiceTest {
     @BeforeEach
     void setUp() {
         placeRepository = mock(PlaceRepository.class);
-        placeSearchService = new PlaceSearchService(placeRepository);
+        placeSearchService = new PlaceSearchService(placeRepository, mock(GooglePlaceSearchClient.class));
     }
 
     @Test
