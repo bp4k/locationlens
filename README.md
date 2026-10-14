@@ -1,46 +1,25 @@
-# LocationLens
-## Command to start and run Docker
+# LocationLens backend
 
-```
-docker run -p 127.0.0.1:8084:8080 \
-  -e KC_BOOTSTRAP_ADMIN_USERNAME=admin \
-  -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin \
-  -v kcdata:/opt/keycloak/data \
-  --name keycloak \
-  quay.io/keycloak/keycloak:26.7.4 start-dev
-```
+Java 21 / Spring Boot backend for place discovery, authentication, reviews and
+business claims. It integrates Keycloak, Google Places API (New), JPA persistence,
+and MySQL/Cloud SQL production configuration.
 
-1. Go to localhost:8084 in your browser and login with admin/admin.
-1. Click on Manage Realms -- Create Realm.
-1. Type realm name as `locationlens`.
-1. click create
-1. Ensure the current realm is locationlens
-1. Go to Users -- create a new user. I am using linus, linus@example.com,
-Linus Sebastian
-1. Click on the Credentials tab -- Set Password, and set a password. Disable
-temporary. I used 11111 as a very secure and totally not easy to guess password.
-1. Now select Clients, Create client. Name it locationlens, type OIDC (which is
-OAuth2)
-1. Enable Client authentication, click on next
-1. Valid redirect uri: http://localhost:8080/login/oauth2/code/common-idp
-1. The client ID is locationlens, client secret is found under credentials tab.
+## Customer/developer handoff
 
-create .env file:
-```
-IDP_CLIENT_ID=<clientid>
-IDP_CLIENT_SECRET=<clientsecret>
-IDP_URI=http://localhost:8084/realms/locationlens
-```
+- [Release notes, fixes and known limitations](RELEASE_NOTES.md)
+- [Installation, configuration, build/run, testing, database setup, deployment and troubleshooting](docs/install.md)
+- [Environment template](.env.example)
+- [API reference and request/response examples](docs/api.md)
+- [Paired frontend repository](https://github.com/bp4k/locationlens.frontend)
 
-run:
-```
-set -a
-. .env
-set +a
-```
+Start with the installation guide. It includes PowerShell and Bash commands,
+first-time Keycloak/client/admin setup, Google configuration, and exact frontend
+callback origins. Spring does not automatically read `.env`; load it before Maven.
 
-now run the app
+Local ports: backend 8080, Keycloak 8084, frontend 5174. H2/create-drop defaults are
+disposable. The paired frontend's Sign out UI is currently removed while deployed
+logout is investigated.
 
-```
-./mvnw spring:run
-```
+For a configured full build use `.\mvnw.cmd clean verify` (Windows) or
+`./mvnw clean verify` (Linux/macOS). See the guide for isolated CI-style testing
+and its excluded context test. Deployment is manual and does not promote traffic.
