@@ -1,0 +1,86 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: keycloak
+  annotations:
+    run.googleapis.com/ingress: all
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "1"
+        run.googleapis.com/execution-environment: gen2
+        run.googleapis.com/cpu-throttling: "false"
+        run.googleapis.com/container-dependencies: '{"keycloak":["cloud-sql-proxy"]}'
+    spec:
+      serviceAccountName: keycloak-runtime@project-one-511222.iam.gserviceaccount.com
+      containerConcurrency: 40
+      timeoutSeconds: 300
+      containers:
+        - name: keycloak
+          image: us-east1-docker.pkg.dev/project-one-511222/locationlens/keycloak:26.7.4
+          ports:
+            - name: http1
+              containerPort: 8080
+          resources:
+            limits:
+              cpu: "2"
+              memory: 2Gi
+          env:
+            - name: KC_HOSTNAME
+              value: https://keycloak-4lkxi3mt2a-ue.a.run.app
+            - name: KC_DB_URL
+              value: jdbc:mysql://127.0.0.1:3306/keycloak?sslMode=DISABLED&allowPublicKeyRetrieval=true
+            - name: KC_DB_USERNAME
+              value: keycloak
+            - name: KC_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-db-password
+                  key: "1"
+            - name: KC_BOOTSTRAP_ADMIN_USERNAME
+              value: bootstrap-admin
+            - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-admin-password
+                  key: "1"
+          startupProbe:
+            httpGet:
+              path: /health/ready
+              port: 9000
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 24
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 9000
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+        - name: cloud-sql-proxy
+          image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.18.2
+          args:
+            - --structured-logs
+            - --address=127.0.0.1
+            - --port=3306
+            - --health-check
+            - --http-address=0.0.0.0
+            - --http-port=9090
+            - project-one-511222:us-east1:project-one-backend-prod-db
+          resources:
+            limits:
+              cpu: "1"
+              memory: 256Mi
+          startupProbe:
+            httpGet:
+              path: /startup
+              port: 9090
+            periodSeconds: 2
+            timeoutSeconds: 1
+            failureThreshold: 30
+  traffic:
+    - latestRevision: true
+      percent: 100
