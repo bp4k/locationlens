@@ -33,7 +33,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 import jakarta.persistence.EntityManagerFactory;
 import net.bp4k.locationlens.entity.BusinessClaim;
-import net.bp4k.locationlens.model.BusinessClaimRequest;
 import net.bp4k.locationlens.model.ClaimStatus;
 import net.bp4k.locationlens.repo.BusinessClaimRepository;
 
@@ -53,6 +52,10 @@ class BusinessClaimServiceIntegrationTest {
                     classes = BusinessClaimRepository.class))
     @Import(BusinessClaimService.class)
     static class DatabaseConfig {
+        @Bean
+        BusinessPlaceLookup placeLookup() {
+            return placeId -> placeId;
+        }
         @Bean
         DataSource dataSource() {
             return new DriverManagerDataSource("jdbc:h2:mem:claim-tests;DB_CLOSE_DELAY=-1;"

@@ -9,6 +9,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 
 import net.bp4k.locationlens.dto.ErrorResponse;
 import net.bp4k.locationlens.exception.DuplicatePlaceException;
@@ -17,6 +18,12 @@ import net.bp4k.locationlens.exception.InvalidTokenException;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ErrorResponse> handleStatus(ResponseStatusException e) {
+        return ResponseEntity.status(e.getStatusCode()).body(new ErrorResponse(
+                String.valueOf(e.getStatusCode().value()),
+                e.getReason() == null ? "Request failed" : e.getReason()));
+    }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException e) {

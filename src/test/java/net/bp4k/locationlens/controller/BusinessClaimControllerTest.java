@@ -99,6 +99,17 @@ class BusinessClaimControllerTest {
     }
 
     @Test
+    void verificationFailureIncludesAnActionableMessage() throws Exception {
+        when(service.submitClaim("user-123", "missing"))
+                .thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Selected business place was not found"));
+        mvc(user()).perform(post("/api/v1/business-claims")
+                .contentType(MediaType.APPLICATION_JSON).content("{\"placeId\":\"missing\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Selected business place was not found"));
+    }
+
+    @Test
     void httpSubmissionBindsJsonAndReturnsCreatedClaim() throws Exception {
         when(authenticationService.requireAuthenticatedUser()).thenReturn(ordinaryUser());
         when(service.submitClaim(USER_ID.toString(), "place-1")).thenReturn(

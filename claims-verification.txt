@@ -1,0 +1,30 @@
+Business claim place verification
+
+BusinessClaimService.submitClaim now calls BusinessPlaceLookup before saving.
+GoogleBusinessPlaceLookup uses Google Places (New) details with the field mask
+id,businessStatus and stores the verified canonical place ID. Ownership is still
+an administrator's decision; closed businesses are not automatically rejected.
+
+Set GOOGLE_PLACES_API_KEY to a server-side key with Places API (New) enabled.
+Do not use a browser-restricted Maps JavaScript key or expose this key through
+VITE variables. GOOGLE_PLACES_BASE_URL defaults to https://places.googleapis.com/v1
+and can point at the loopback fixture for tests. Missing configuration fails
+closed with 503. Unknown IDs return 404; locations without a business status
+return 400. Provider failures never save claims or report success.
+
+This adapter is a reusable lookup boundary, not a replacement for the team's
+PlaceSearchService/PlaceController work. Current master still has placeholder
+place endpoints, so claim verification calls the provider directly rather than
+calling the application over HTTP or trusting a frontend-submitted place name.
+
+Run the backend suite without a live issuer:
+  mvnw -Dtest=!LocationlensApplicationTests test
+
+Browser end-to-end tests are in the sibling frontend tests/e2e directory. Build
+this backend first (mvnw -DskipTests package), then run frontend npm run test:e2e.
+Those tests exercise a real browser, OIDC redirect/code exchange, signed JWT
+validation, REST endpoints and JPA; external Google/OIDC providers are fixtures.
+Live Google/Keycloak and MariaDB restart testing remain deployment verification.
+
+Google contract reference:
+https://developers.google.com/maps/documentation/places/web-service/place-details

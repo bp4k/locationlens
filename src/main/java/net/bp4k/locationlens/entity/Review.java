@@ -20,13 +20,13 @@ import lombok.Getter;
     name="review",
     check = @CheckConstraint (
         name="ck_review_rating_range",
-        constraint = "rating >= 1 AND rating <= 5"
+        constraint = "\"rating\" >= 1 AND \"rating\" <= 5"
     ),
     indexes = {
-        @Index(name="idx_review_place_id", columnList = "place_id")
+        @Index(name="idx_review_place_id", columnList = "placeId")
     },
     uniqueConstraints = {
-        @UniqueConstraint(name="uk_review_user_place", columnNames = {"user_id", "place_id"})
+        @UniqueConstraint(name="uk_review_user_place", columnNames = {"userId", "placeId"})
     }
 )
 public class Review
