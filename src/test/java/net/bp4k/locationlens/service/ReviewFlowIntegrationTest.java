@@ -6,6 +6,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup;
 
 import java.util.UUID;
+import java.time.Duration;
+import java.time.Instant;
 import javax.sql.DataSource;
 import jakarta.persistence.EntityManagerFactory;
 
@@ -30,6 +32,7 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 import tools.jackson.databind.json.JsonMapper;
 
 import net.bp4k.locationlens.controller.*;
+import net.bp4k.locationlens.dto.ReviewResponse;
 import net.bp4k.locationlens.entity.*;
 import net.bp4k.locationlens.repo.*;
 
@@ -99,12 +102,21 @@ class ReviewFlowIntegrationTest {
             .andExpect(jsonPath("$.place_id").value("dummy-1"))
             .andExpect(jsonPath("$.rating").value(5)).andExpect(jsonPath("$.created_at").exists())
             .andReturn().getResponse().getContentAsString();
-        var parsed = JsonMapper.builder().build().readTree(response);
-        assertTrue(reviewRepository.findById(UUID.fromString(parsed.get("review_id").asString())).isPresent());
+        var mapper = JsonMapper.builder().build();
+        var parsed = mapper.readTree(response);
+        var persisted = reviewRepository.findById(UUID.fromString(parsed.get("review_id").asString())).orElseThrow();
+        assertEquals(USER, persisted.getUserId().toString());
+        assertEquals("dummy-1", persisted.getPlaceId());
+        assertEquals(5, persisted.getRating());
+        assertEquals("Lovely park!", persisted.getText());
+        assertWithinDatabasePrecision(Instant.parse(parsed.get("created_at").asString()), persisted.getCreatedAt());
+        // Reads return the committed database representation, not the in-memory
+        // nanosecond value returned by creation. H2 stores timestamp(6).
+        String storedResponse = mapper.writeValueAsString(ReviewResponse.from(persisted));
         mvc.perform(get("/api/v1/reviews/place/dummy-1"))
-            .andExpect(status().isOk()).andExpect(content().json("[" + response + "]"));
+            .andExpect(status().isOk()).andExpect(content().json("[" + storedResponse + "]"));
         mvc.perform(get("/api/v1/reviews/history"))
-            .andExpect(status().isOk()).andExpect(content().json("[" + response + "]"));
+            .andExpect(status().isOk()).andExpect(content().json("[" + storedResponse + "]"));
         mvc.perform(post("/api/v1/reviews").contentType(MediaType.APPLICATION_JSON).content(request))
             .andExpect(status().isConflict()).andExpect(jsonPath("$.message").value("You have already reviewed this place"));
         assertEquals(1, reviewRepository.count());
@@ -112,7 +124,26 @@ class ReviewFlowIntegrationTest {
         mvc.perform(get("/api/v1/reviews/history"))
             .andExpect(status().isOk()).andExpect(content().json("[]"));
         mvc.perform(get("/api/v1/reviews/place/dummy-1"))
-            .andExpect(status().isOk()).andExpect(content().json("[" + response + "]"));
+            .andExpect(status().isOk()).andExpect(content().json("[" + storedResponse + "]"));
+    }
+
+    private static void assertWithinDatabasePrecision(Instant original, Instant stored) {
+        assertTrue(Math.abs(Duration.between(original, stored).toNanos()) < 1_000,
+            "Persisted timestamp must differ by less than one microsecond");
+    }
+
+    @Test void databaseRoundTripHandlesNonMicrosecondCreationTime() throws Exception {
+        login(USER);
+        UUID id = UUID.randomUUID();
+        Instant created = Instant.parse("2026-10-14T05:53:08.690317959Z");
+        reviewRepository.saveAndFlush(new Review(id, 5, "Precision regression", created,
+            UUID.fromString(USER), "dummy-1"));
+        var stored = reviewRepository.findById(id).orElseThrow();
+        assertWithinDatabasePrecision(created, stored.getCreatedAt());
+        var mapper = JsonMapper.builder().build();
+        mvc.perform(get("/api/v1/reviews/place/dummy-1"))
+            .andExpect(status().isOk())
+            .andExpect(content().json("[" + mapper.writeValueAsString(ReviewResponse.from(stored)) + "]"));
     }
 
     @Test void invalidSubmissionDoesNotPersistAndMissingIdentityIsRejected() throws Exception {
