@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
 
 import net.bp4k.locationlens.dto.ErrorResponse;
+import net.bp4k.locationlens.exception.DuplicatePlaceException;
 import net.bp4k.locationlens.exception.DuplicateReviewException;
 import net.bp4k.locationlens.exception.InvalidTokenException;
 
@@ -43,6 +44,11 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(DuplicateReviewException.class)
     public ResponseEntity<ErrorResponse> handleDuplicate(DuplicateReviewException e) {
+        return build(HttpStatus.CONFLICT, e.getMessage());
+    }
+
+    @ExceptionHandler(DuplicatePlaceException.class)
+    public ResponseEntity<ErrorResponse> handleDuplicatePlace(DuplicatePlaceException e) {
         return build(HttpStatus.CONFLICT, e.getMessage());
     }
 
