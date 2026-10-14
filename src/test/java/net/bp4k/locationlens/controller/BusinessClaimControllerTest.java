@@ -19,7 +19,7 @@ import org.springframework.http.MediaType;
 
 import net.bp4k.locationlens.entity.User;
 import net.bp4k.locationlens.exception.InvalidTokenException;
-import net.bp4k.locationlens.model.BusinessClaimRequest;
+import net.bp4k.locationlens.dto.BusinessClaimRequest;
 import net.bp4k.locationlens.model.ClaimStatus;
 import net.bp4k.locationlens.service.AuthenticationService;
 import net.bp4k.locationlens.service.BusinessClaimService;
@@ -103,7 +103,7 @@ class BusinessClaimControllerTest {
         when(service.submitClaim("user-123", "missing"))
                 .thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Selected business place was not found"));
-        mvc(user()).perform(post("/api/v1/business-claims")
+        mvc().perform(post("/api/v1/business-claims")
                 .contentType(MediaType.APPLICATION_JSON).content("{\"placeId\":\"missing\"}"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value("Selected business place was not found"));

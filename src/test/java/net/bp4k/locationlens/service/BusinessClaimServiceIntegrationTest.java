@@ -35,6 +35,7 @@ import jakarta.persistence.EntityManagerFactory;
 import net.bp4k.locationlens.entity.BusinessClaim;
 import net.bp4k.locationlens.model.ClaimStatus;
 import net.bp4k.locationlens.repo.BusinessClaimRepository;
+import net.bp4k.locationlens.dto.BusinessClaimRequest;
 
 import static org.junit.jupiter.api.Assertions.*;
 
