@@ -2,13 +2,13 @@ package net.bp4k.locationlens.controller;
 
 import java.util.List;
 
-import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
+import net.bp4k.locationlens.dto.CriteriaRequest;
 import net.bp4k.locationlens.dto.PlaceResponse;
 import net.bp4k.locationlens.model.PlaceType;
 import net.bp4k.locationlens.service.PlaceSearchService;
@@ -22,30 +22,19 @@ public class PlaceController {
         this.placeSearchService = placeSearchService;
     }
 
-    // Search still uses the team's sample catalog until live search is connected.
-    // Keep one catalog so every result has a matching detail response.
-    private static final List<PlaceResponse> SAMPLE_PLACES = List.of(
-        new PlaceResponse("dummy-1", "Piedmont Park", "400 Park Dr NE, Atlanta, GA",
-            33.7850, -84.3738, List.of(PlaceType.PARK)),
-        new PlaceResponse("dummy-2", "Georgia Aquarium", "225 Baker St NW, Atlanta, GA",
-            33.7634, -84.3951, List.of(PlaceType.ATTRACTION)),
-        new PlaceResponse("dummy-3", "Ponce City Market", "675 Ponce De Leon Ave NE, Atlanta, GA",
-            33.7725, -84.3655, List.of(PlaceType.RESTAURANT)));
-
     @GetMapping("/search")
-    public List<PlaceResponse> search() {
-        return SAMPLE_PLACES;
+    public List<PlaceResponse> search(
+            @RequestParam(name = "location_text", required = false) String locationText,
+            @RequestParam(required = false) Double latitude,
+            @RequestParam(required = false) Double longitude,
+            @RequestParam(name = "radius_meters") Integer radiusMeters,
+            @RequestParam(name = "place_type", required = false) PlaceType placeType) {
+        return placeSearchService.search(new CriteriaRequest(
+                locationText, latitude, longitude, radiusMeters, placeType));
     }
 
     @GetMapping("/{placeId}")
-    public PlaceResponse getPlaceDetails(@PathVariable("placeId") String placeId) {
-        var place = placeSearchService.getPlaceDetails(placeId);
-        if (place != null) {
-            return PlaceResponse.from(place);
-        }
-        return SAMPLE_PLACES.stream()
-            .filter(sample -> sample.placeId().equals(placeId))
-            .findFirst()
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Place not found"));
+    public PlaceResponse getPlaceDetails(@PathVariable String placeId) {
+        return placeSearchService.getPlaceResponse(placeId);
     }
 }

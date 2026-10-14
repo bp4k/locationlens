@@ -7,7 +7,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import net.bp4k.locationlens.model.PlaceType;
 import net.bp4k.locationlens.entity.Place;
 
-/** Public place contract for future search/detail endpoints. Coordinates are decimal degrees. */
+/** Public search/detail contract. Coordinates are decimal degrees. */
 public record PlaceResponse(
     @JsonProperty("place_id") String placeId,
     @JsonProperty("name") String name,
@@ -24,4 +24,5 @@ public record PlaceResponse(
     public PlaceResponse {
         types = List.copyOf(types);
     }
+
 }

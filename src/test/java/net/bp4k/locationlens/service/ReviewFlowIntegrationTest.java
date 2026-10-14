@@ -49,6 +49,9 @@ class ReviewFlowIntegrationTest {
             classes = {ReviewRepository.class, UserRepository.class, PlaceRepository.class}))
     @Import({ReviewService.class, AuthenticationService.class, PlaceSearchService.class})
     static class DatabaseConfig {
+        @Bean GooglePlaceSearchClient googlePlaces() {
+            return new GooglePlaceSearchClient("", "http://127.0.0.1:1/v1", JsonMapper.builder().build());
+        }
         @Bean DataSource dataSource() {
             return new DriverManagerDataSource("jdbc:h2:mem:review-flow;DB_CLOSE_DELAY=-1", "sa", "");
         }
@@ -71,11 +74,15 @@ class ReviewFlowIntegrationTest {
     @Autowired private PlaceSearchService places;
     @Autowired private ReviewRepository reviewRepository;
     @Autowired private UserRepository userRepository;
+    @Autowired private PlaceRepository placeRepository;
     private MockMvc mvc;
 
     @BeforeEach void setup() {
         reviewRepository.deleteAllInBatch();
         userRepository.deleteAllInBatch();
+        placeRepository.deleteAll();
+        placeRepository.saveAndFlush(new Place("dummy-1", "Piedmont Park", "Atlanta", 33.785, -84.3738,
+                java.util.Set.of(net.bp4k.locationlens.model.PlaceType.PARK)));
         mvc = standaloneSetup(new ReviewController(reviews, authentication), new PlaceController(places))
             .setControllerAdvice(new ApiExceptionHandler()).build();
     }

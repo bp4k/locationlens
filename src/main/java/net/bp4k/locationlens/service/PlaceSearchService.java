@@ -7,6 +7,11 @@ import java.util.List;
 import net.bp4k.locationlens.entity.Place;
 import net.bp4k.locationlens.model.PlaceType;
 import net.bp4k.locationlens.repo.PlaceRepository;
+import net.bp4k.locationlens.dto.CriteriaRequest;
+import net.bp4k.locationlens.dto.PlaceResponse;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Implements place search and lookup.
@@ -16,9 +21,27 @@ import net.bp4k.locationlens.repo.PlaceRepository;
 public class PlaceSearchService {
 
     private final PlaceRepository placeRepository;
+    private final GooglePlaceSearchClient googlePlaces;
 
-    public PlaceSearchService(PlaceRepository placeRepository) {
+    public PlaceSearchService(PlaceRepository placeRepository, GooglePlaceSearchClient googlePlaces) {
         this.placeRepository = placeRepository;
+        this.googlePlaces = googlePlaces;
+    }
+
+    /** The public search uses live places, even when the local catalog is empty. */
+    public List<PlaceResponse> search(CriteriaRequest criteria) {
+        criteria.validate();
+        return googlePlaces.search(criteria);
+    }
+
+    /** Local entries retain their details; Google IDs are resolved by the provider. */
+    @Transactional(readOnly = true)
+    public PlaceResponse getPlaceResponse(String placeId) {
+        if (placeId == null || placeId.isBlank() || placeId.length() > 255) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid place ID");
+        }
+        Place local = getPlaceDetails(placeId);
+        return local != null ? PlaceResponse.from(local) : googlePlaces.getPlaceDetails(placeId);
     }
 
     /**
