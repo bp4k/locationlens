@@ -31,6 +31,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
 import net.bp4k.locationlens.entity.Review;
+import net.bp4k.locationlens.entity.User;
+import net.bp4k.locationlens.repo.UserRepository;
+import net.bp4k.locationlens.service.AuthenticationService;
 import net.bp4k.locationlens.service.ReviewService;
 
 class ReviewControllerTest {
@@ -42,26 +45,34 @@ class ReviewControllerTest {
     private static final Instant CREATED_AT =
             Instant.parse("2026-01-01T12:00:00Z");
 
-    private ReviewService reviewService; 
-    private MockMvc mockMvc; 
-    private Review review; 
-    
-    @BeforeEach 
+    private ReviewService reviewService;
+    private UserRepository userRepository;
+    private MockMvc mockMvc;
+    private Review review;
+
+    @BeforeEach
     void setUp()
     {
         reviewService = mock(ReviewService.class);
-        //Mvc may try to construct jwt from request, which can produce "tokenValue cannot be empty" error
-        mockMvc = standaloneSetup(new ReviewController(reviewService)).setCustomArgumentResolvers(new org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver()).build();
-    
+        userRepository = mock(UserRepository.class);
+        AuthenticationService authenticationService = new AuthenticationService(userRepository);
+        mockMvc = standaloneSetup(new ReviewController(reviewService, authenticationService)).build();
+
         review = new Review(REVIEW_ID, 5, "Great place", CREATED_AT, USER_ID, PLACE_ID);
     }
 
-    @AfterEach 
+    @AfterEach
     void clearSecurityContext()
     {
         SecurityContextHolder.clearContext();
     }
 
+    /**
+     * Authenticates as {@code userId}, and makes
+     * {@code AuthenticationService#requireAuthenticatedUser} (which the
+     * controller now calls, rather than taking a {@code Jwt} parameter)
+     * resolve to a persisted {@link User} with that id.
+     */
     private void authenticateAs(UUID userId) {
         Instant now = Instant.now();
         Jwt jwt = Jwt.withTokenValue("test-token")
@@ -74,6 +85,9 @@ class ReviewControllerTest {
         SecurityContext context = SecurityContextHolder.createEmptyContext();
         context.setAuthentication(new JwtAuthenticationToken(jwt));
         SecurityContextHolder.setContext(context);
+
+        when(userRepository.findById(userId))
+                .thenReturn(Optional.of(new User(userId, "user@example.com", "Test User")));
     }
 
 

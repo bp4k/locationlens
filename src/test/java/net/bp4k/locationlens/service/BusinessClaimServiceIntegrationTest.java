@@ -21,7 +21,6 @@ import org.springframework.context.annotation.Import;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.orm.jpa.JpaTransactionManager;
 import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
 import org.springframework.orm.jpa.persistenceunit.PersistenceManagedTypes;
@@ -33,11 +32,10 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
 import jakarta.persistence.EntityManagerFactory;
-import net.bp4k.locationlens.controller.BusinessClaimController;
-import net.bp4k.locationlens.dto.BusinessClaimRequest;
 import net.bp4k.locationlens.entity.BusinessClaim;
 import net.bp4k.locationlens.model.ClaimStatus;
 import net.bp4k.locationlens.repo.BusinessClaimRepository;
+import net.bp4k.locationlens.dto.BusinessClaimRequest;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -53,7 +51,7 @@ class BusinessClaimServiceIntegrationTest {
     @EnableJpaRepositories(basePackageClasses = BusinessClaimRepository.class,
             includeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE,
                     classes = BusinessClaimRepository.class))
-    @Import({BusinessClaimService.class, BusinessClaimController.class})
+    @Import(BusinessClaimService.class)
     static class DatabaseConfig {
         @Bean
         BusinessPlaceLookup placeLookup() {
@@ -82,7 +80,6 @@ class BusinessClaimServiceIntegrationTest {
     }
 
     @Autowired private BusinessClaimService service;
-    @Autowired private BusinessClaimController controller;
     @Autowired private BusinessClaimRepository repository;
     @Autowired private PlatformTransactionManager transactionManager;
 
@@ -93,9 +90,7 @@ class BusinessClaimServiceIntegrationTest {
 
     @Test
     void submissionAndPendingQueryReadCommittedDatabaseState() {
-        Jwt jwt = Jwt.withTokenValue("test").header("alg", "RS256").subject(USER_ID).build();
-        BusinessClaimRequest created = controller.submitClaim(
-                new BusinessClaimController.SubmitClaimRequest("place-1"), jwt);
+        BusinessClaimRequest created = service.submitClaim(USER_ID, "place-1");
         BusinessClaim persisted = repository.findById(UUID.fromString(created.id())).orElseThrow();
         assertEquals(UUID.fromString(USER_ID), persisted.getUserId());
         assertEquals("place-1", persisted.getPlaceId());
