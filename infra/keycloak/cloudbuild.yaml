@@ -1,0 +1,11 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --platform=linux/amd64
+      - --tag=${_IMAGE}
+      - .
+images:
+  - ${_IMAGE}
+substitutions:
+  _IMAGE: us-east1-docker.pkg.dev/project-one-511222/locationlens/keycloak:26.7.4
